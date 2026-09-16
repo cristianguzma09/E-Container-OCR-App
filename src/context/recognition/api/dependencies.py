@@ -52,6 +52,7 @@ def get_ocr_engine() -> OcrEngine:
         return PaddleOcrEngine(
             language=settings.ocr_language,
             minimum_confidence=settings.ocr_minimum_confidence,
+            enable_mkldnn=settings.ocr_enable_mkldnn,
         )
 
     if choice != "stub":

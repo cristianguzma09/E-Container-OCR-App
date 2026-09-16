@@ -35,6 +35,8 @@ class Settings(BaseSettings):
     ocr_engine: str = "stub"
     ocr_language: str = "en"
     ocr_minimum_confidence: float = 0.3
+    # oneDNN crashes PaddlePaddle 3.3 on some Windows CPUs; off unless asked.
+    ocr_enable_mkldnn: bool = False
     image_store_path: str = "var/captures"
 
 

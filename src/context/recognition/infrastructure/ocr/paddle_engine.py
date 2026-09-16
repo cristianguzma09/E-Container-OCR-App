@@ -37,6 +37,12 @@ class PaddleOcrEngine(OcrEngine):
     Angle classification is on by default: container numbers are frequently
     photographed at a slant, and on many boxes the number is painted
     vertically down the door post.
+
+    oneDNN is off by default. It normally speeds up CPU inference, but
+    PaddlePaddle 3.3 raises ``ConvertPirAttribute2RuntimeAttribute not
+    support`` from its oneDNN kernels on some Windows CPUs, which takes the
+    whole pipeline down. A slower engine beats an engine that does not run, so
+    it is opt-in via ``OCR_ENABLE_MKLDNN=true``.
     """
 
     def __init__(
@@ -45,10 +51,12 @@ class PaddleOcrEngine(OcrEngine):
         language: str = "en",
         use_angle_classification: bool = True,
         minimum_confidence: float = 0.3,
+        enable_mkldnn: bool = False,
     ) -> None:
         self._language = language
         self._use_angle_classification = use_angle_classification
         self._minimum_confidence = minimum_confidence
+        self._enable_mkldnn = enable_mkldnn
         self._engine: Any | None = None
 
     @property
@@ -70,14 +78,18 @@ class PaddleOcrEngine(OcrEngine):
                 "'pip install -r requirements-ocr.txt', or set OCR_ENGINE=stub",
             ) from error
 
-        # Constructor keywords have moved between PaddleOCR 2.x and 3.x, so
-        # the richest form is tried first and progressively narrowed.
+        # Constructor keywords moved between PaddleOCR 2.x and 3.x - angle
+        # classification is `use_textline_orientation` in 3.x and
+        # `use_angle_cls` in 2.x - so the 3.x form is tried first and the
+        # options are progressively narrowed until one is accepted.
+        base: dict[str, Any] = {
+            "lang": self._language,
+            "enable_mkldnn": self._enable_mkldnn,
+        }
         attempts: list[dict[str, Any]] = [
-            {
-                "lang": self._language,
-                "use_angle_cls": self._use_angle_classification,
-                "show_log": False,
-            },
+            {**base, "use_textline_orientation": self._use_angle_classification},
+            {**base, "use_angle_cls": self._use_angle_classification},
+            base,
             {"lang": self._language, "use_angle_cls": self._use_angle_classification},
             {"lang": self._language},
             {},

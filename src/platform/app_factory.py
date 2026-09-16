@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.platform.config import get_settings
+from src.platform.error_handlers import register_error_handlers
 
 
 def create_app() -> FastAPI:
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     def health_check() -> dict[str, str]:
         return {"status": "healthy"}
 
+    register_error_handlers(app)
     _register_routers(app)
     return app
 
@@ -47,8 +49,11 @@ def create_app() -> FastAPI:
 def _register_routers(app: FastAPI) -> None:
     """Mount each bounded context's API router.
 
-    Wired up in later steps, e.g.::
-
-        from src.context.registry.api.router import router as registry_router
-        app.include_router(registry_router)
+    Imported inside the function so that building the app is what pulls in the
+    adapters, not merely importing this module.
     """
+    from src.context.recognition.api.router import router as recognition_router
+    from src.context.registry.api.router import router as registry_router
+
+    app.include_router(registry_router)
+    app.include_router(recognition_router)

@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
 
 from src.context.registry.domain.errors import InvalidContainerNumber
-from src.context.registry.domain.services.check_digit_calculator import (
-    calculate_check_digit,
-)
 from src.shared_kernel.domain import ValueObject
-
-_FORMAT = re.compile(r"[A-Z]{3}[UJZ]\d{6}\d")
-_SEPARATORS = re.compile(r"[\s\-_.]")
+from src.shared_kernel.iso6346 import (
+    NUMBER_PATTERN as _FORMAT,
+)
+from src.shared_kernel.iso6346 import (
+    calculate_check_digit,
+    normalise,
+)
 
 
 @dataclass(frozen=True)
@@ -67,7 +67,7 @@ class ContainerNumber(ValueObject):
     @classmethod
     def parse(cls, raw: str) -> ContainerNumber:
         """Build a number from a raw string, tolerating spaces, dashes and case."""
-        cleaned = _SEPARATORS.sub("", raw or "").upper()
+        cleaned = normalise(raw)
         match = _FORMAT.fullmatch(cleaned)
         if match is None:
             raise InvalidContainerNumber(

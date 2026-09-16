@@ -27,12 +27,10 @@ from src.context.registry.domain.model.inspection import Inspection
 from src.context.registry.domain.model.size_type import ContainerType, SizeType
 from src.context.registry.domain.port.container_repository import ContainerRepository
 from src.context.registry.domain.port.inspection_repository import InspectionRepository
-from src.context.registry.domain.services.check_digit_calculator import (
-    calculate_check_digit,
-)
 from src.context.registry.domain.services.condition_grading_policy import (
     ConditionGradingPolicy,
 )
+from src.shared_kernel.iso6346 import calculate_check_digit
 
 __all__ = [
     "CargoGrade",

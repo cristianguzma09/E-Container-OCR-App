@@ -30,6 +30,13 @@ class Settings(BaseSettings):
 
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:4200"])
 
+    # Recognition. The default engine is the stub, so the app starts and the
+    # test suite runs on a machine that has never installed PaddleOCR.
+    ocr_engine: str = "stub"
+    ocr_language: str = "en"
+    ocr_minimum_confidence: float = 0.3
+    image_store_path: str = "var/captures"
+
 
 @lru_cache
 def get_settings() -> Settings:

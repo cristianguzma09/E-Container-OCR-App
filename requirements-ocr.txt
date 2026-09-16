@@ -1,0 +1,12 @@
+-r requirements.txt
+
+# Heavy OCR stack, deliberately kept out of requirements.txt.
+# Roughly 1-2 GB on disk once PaddlePaddle and its detection/recognition
+# models are downloaded. Install only when you want real OCR:
+#
+#     pip install -r requirements-ocr.txt
+#
+# then set OCR_ENGINE=paddleocr in .env. Without it the app runs on the
+# stub engine and every test still passes.
+paddleocr>=2.7
+paddlepaddle>=2.6

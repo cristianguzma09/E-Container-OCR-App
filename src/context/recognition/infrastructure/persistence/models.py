@@ -37,5 +37,12 @@ class RecognitionJobModel(Base):
     )
     best_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
 
+    # Filled in once a person signs the reading off.
+    confirmed_container_number: Mapped[str | None] = mapped_column(
+        String(11), nullable=True, index=True
+    )
+    confirmed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    confirmed_at: Mapped[datetime | None] = mapped_column(UtcDateTime, nullable=True)
+
     fragments: Mapped[list[Any]] = mapped_column(JSON, default=list)
     candidates: Mapped[list[Any]] = mapped_column(JSON, default=list)

@@ -40,3 +40,20 @@ class RecognitionFailed(DomainEvent):
     job_id: uuid.UUID
     image_ref: str
     reason: str
+
+
+@dataclass(frozen=True, kw_only=True)
+class RecognitionConfirmed(DomainEvent):
+    """A person accepted a reading and the container went on the register.
+
+    ``was_corrected`` says whether the operator overrode the engine. Tracked
+    deliberately: the override rate is the only honest measure of how well
+    OCR is doing in the yard, as opposed to on test images.
+    """
+
+    job_id: uuid.UUID
+    image_ref: str
+    container_number: str
+    confirmed_by: str
+    was_corrected: bool
+    was_read: str | None

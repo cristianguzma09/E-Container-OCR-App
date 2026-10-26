@@ -93,6 +93,9 @@ def job_to_domain(model: RecognitionJobModel) -> RecognitionJob:
         candidates=[candidate_from_json(c) for c in model.candidates or []],
         failure_reason=model.failure_reason,
         completed_at=model.completed_at,
+        confirmed_container_number=model.confirmed_container_number,
+        confirmed_by=model.confirmed_by,
+        confirmed_at=model.confirmed_at,
     )
 
 
@@ -112,6 +115,9 @@ def apply_to_model(model: RecognitionJobModel, job: RecognitionJob) -> None:
     model.status = str(job.status)
     model.completed_at = job.completed_at
     model.failure_reason = job.failure_reason
+    model.confirmed_container_number = job.confirmed_container_number
+    model.confirmed_by = job.confirmed_by
+    model.confirmed_at = job.confirmed_at
     model.best_container_number = best.value if best else None
     model.best_confidence = best.confidence.value if best else None
     model.fragments = [fragment_to_json(f) for f in job.fragments]

@@ -19,6 +19,7 @@ from src.context.registry.application import (
     ContainerNotFound,
 )
 from src.shared_kernel.domain import BusinessRuleViolation, DomainError
+from src.workflows import CaptureNotConfirmable
 
 _CAMEL_BOUNDARY = re.compile(r"(?<!^)(?=[A-Z])")
 
@@ -48,6 +49,15 @@ def register_error_handlers(app: FastAPI) -> None:
     @app.exception_handler(ContainerAlreadyRegistered)
     async def _conflict(
         request: Request, exc: ContainerAlreadyRegistered
+    ) -> JSONResponse:
+        return JSONResponse(
+            status_code=409,
+            content={"code": error_code(exc), "detail": str(exc)},
+        )
+
+    @app.exception_handler(CaptureNotConfirmable)
+    async def _not_confirmable(
+        request: Request, exc: CaptureNotConfirmable
     ) -> JSONResponse:
         return JSONResponse(
             status_code=409,

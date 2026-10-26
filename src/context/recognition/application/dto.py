@@ -97,6 +97,10 @@ class RecognitionJobView:
     completed_at: datetime | None
     failure_reason: str | None
 
+    confirmed_container_number: str | None
+    confirmed_by: str | None
+    confirmed_at: datetime | None
+
     container_number: str | None
     confidence: float | None
     check_digit_valid: bool | None
@@ -117,7 +121,16 @@ class RecognitionJobView:
             submitted_by=job.submitted_by,
             completed_at=job.completed_at,
             failure_reason=job.failure_reason,
-            container_number=best.value if job.is_conclusive and best else None,
+            confirmed_container_number=job.confirmed_container_number,
+            confirmed_by=job.confirmed_by,
+            confirmed_at=job.confirmed_at,
+            # Once a person has signed a number off it is the answer, whatever
+            # the engine made of the photo.
+            container_number=(
+                job.confirmed_container_number
+                if job.is_confirmed
+                else (best.value if job.is_conclusive and best else None)
+            ),
             confidence=best.confidence.value if best else None,
             check_digit_valid=best.check_digit_valid if best else None,
             repaired=best.repaired if best else None,

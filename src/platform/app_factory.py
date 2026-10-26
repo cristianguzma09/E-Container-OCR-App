@@ -54,6 +54,8 @@ def _register_routers(app: FastAPI) -> None:
     """
     from src.context.recognition.api.router import router as recognition_router
     from src.context.registry.api.router import router as registry_router
+    from src.workflows.router import router as capture_router
 
     app.include_router(registry_router)
     app.include_router(recognition_router)
+    app.include_router(capture_router)

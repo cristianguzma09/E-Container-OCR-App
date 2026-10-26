@@ -9,6 +9,7 @@ from enum import StrEnum
 
 from src.context.recognition.domain.events import (
     RecognitionCompleted,
+    RecognitionConfirmed,
     RecognitionFailed,
     RecognitionRequested,
 )
@@ -25,9 +26,22 @@ class JobStatus(StrEnum):
     COMPLETED = "COMPLETED"
     NEEDS_REVIEW = "NEEDS_REVIEW"
     FAILED = "FAILED"
+    CONFIRMED = "CONFIRMED"
 
 
-TERMINAL = frozenset({JobStatus.COMPLETED, JobStatus.NEEDS_REVIEW, JobStatus.FAILED})
+#: No further engine work may touch a job in one of these states.
+TERMINAL = frozenset(
+    {
+        JobStatus.COMPLETED,
+        JobStatus.NEEDS_REVIEW,
+        JobStatus.FAILED,
+        JobStatus.CONFIRMED,
+    }
+)
+
+#: A person may only sign off a job that actually produced a reading.
+#: A failed or still-running job has nothing to confirm.
+CONFIRMABLE = frozenset({JobStatus.COMPLETED, JobStatus.NEEDS_REVIEW})
 
 
 class RecognitionJob(AggregateRoot[uuid.UUID]):
@@ -58,6 +72,9 @@ class RecognitionJob(AggregateRoot[uuid.UUID]):
         candidates: Sequence[ContainerCodeCandidate] = (),
         failure_reason: str | None = None,
         completed_at: datetime | None = None,
+        confirmed_container_number: str | None = None,
+        confirmed_by: str | None = None,
+        confirmed_at: datetime | None = None,
     ) -> None:
         super().__init__(job_id)
         self._image_ref = image_ref
@@ -68,6 +85,9 @@ class RecognitionJob(AggregateRoot[uuid.UUID]):
         self._candidates = tuple(candidates)
         self._failure_reason = failure_reason
         self._completed_at = completed_at
+        self._confirmed_container_number = confirmed_container_number
+        self._confirmed_by = confirmed_by
+        self._confirmed_at = confirmed_at
 
     @classmethod
     def submit(
@@ -134,6 +154,27 @@ class RecognitionJob(AggregateRoot[uuid.UUID]):
         return self._completed_at
 
     @property
+    def confirmed_container_number(self) -> str | None:
+        """The number a person signed off, once they have."""
+        return self._confirmed_container_number
+
+    @property
+    def confirmed_by(self) -> str | None:
+        return self._confirmed_by
+
+    @property
+    def confirmed_at(self) -> datetime | None:
+        return self._confirmed_at
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self._status is JobStatus.CONFIRMED
+
+    @property
+    def can_be_confirmed(self) -> bool:
+        return self._status in CONFIRMABLE
+
+    @property
     def is_finished(self) -> bool:
         return self._status in TERMINAL
 
@@ -187,6 +228,58 @@ class RecognitionJob(AggregateRoot[uuid.UUID]):
         self.record_event(
             RecognitionFailed(
                 job_id=self.id, image_ref=self._image_ref, reason=reason
+            )
+        )
+
+    def confirm(
+        self,
+        container_number: str,
+        *,
+        confirmed_by: str,
+        confirmed_at: datetime | None = None,
+    ) -> None:
+        """Record that a person signed off this reading.
+
+        ``container_number`` is what the operator actually accepted, which is
+        not always what the engine read - correcting a bad read is the whole
+        point of the review queue. The difference between the two is kept as
+        ``was_corrected`` on the event, because the rate at which operators
+        override the engine is the only honest measure of how well it works.
+        """
+        if self._status not in CONFIRMABLE:
+            raise BusinessRuleViolation(
+                "recognition_job_not_confirmable",
+                f"cannot confirm job {self.id}: it is {self._status}, "
+                f"and only a job that produced a reading can be signed off",
+            )
+
+        number = (container_number or "").strip().upper()
+        if not number:
+            raise BusinessRuleViolation(
+                "confirmation_needs_a_number",
+                "a confirmation must name the container number being accepted",
+            )
+        if not confirmed_by or not confirmed_by.strip():
+            raise BusinessRuleViolation(
+                "confirmation_needs_an_operator",
+                "a confirmation must name who signed it off",
+            )
+
+        read = self.best_candidate.value if self.best_candidate else None
+
+        self._confirmed_container_number = number
+        self._confirmed_by = confirmed_by.strip()
+        self._confirmed_at = confirmed_at or datetime.now(UTC)
+        self._status = JobStatus.CONFIRMED
+
+        self.record_event(
+            RecognitionConfirmed(
+                job_id=self.id,
+                image_ref=self._image_ref,
+                container_number=number,
+                confirmed_by=self._confirmed_by,
+                was_corrected=read != number,
+                was_read=read,
             )
         )
 

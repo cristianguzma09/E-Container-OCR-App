@@ -11,6 +11,7 @@ from src.context.recognition.domain.errors import (
 )
 from src.context.recognition.domain.events import (
     RecognitionCompleted,
+    RecognitionConfirmed,
     RecognitionFailed,
     RecognitionRequested,
 )
@@ -20,6 +21,7 @@ from src.context.recognition.domain.model.container_code_candidate import (
     ContainerCodeCandidate,
 )
 from src.context.recognition.domain.model.recognition_job import (
+    CONFIRMABLE,
     JobStatus,
     RecognitionJob,
 )
@@ -43,7 +45,9 @@ __all__ = [
     "JobStatus",
     "OcrEngine",
     "OcrEngineFailure",
+    "CONFIRMABLE",
     "RecognitionCompleted",
+    "RecognitionConfirmed",
     "RecognitionError",
     "RecognitionFailed",
     "RecognitionJob",

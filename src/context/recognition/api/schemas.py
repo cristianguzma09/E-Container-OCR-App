@@ -35,10 +35,10 @@ class FragmentResponse(BaseModel):
 class RecognitionJobResponse(BaseModel):
     """The capture screen polls this until ``status`` leaves PENDING/PROCESSING.
 
-    ``container_number`` is populated only when the job is conclusive. If it
-    is null but ``candidates`` is not empty, something was read that a person
-    has to confirm - which is exactly the case a client must not silently
-    treat as an answer.
+    ``container_number`` is populated when the job is conclusive, or once an
+    operator has confirmed one. If it is null but ``candidates`` is not empty,
+    something was read that a person still has to confirm - exactly the case a
+    client must not silently treat as an answer.
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -50,6 +50,10 @@ class RecognitionJobResponse(BaseModel):
     submitted_by: str | None
     completed_at: datetime | None
     failure_reason: str | None
+
+    confirmed_container_number: str | None
+    confirmed_by: str | None
+    confirmed_at: datetime | None
 
     container_number: str | None
     confidence: float | None

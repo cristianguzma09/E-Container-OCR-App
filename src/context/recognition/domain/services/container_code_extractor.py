@@ -26,6 +26,7 @@ from src.context.recognition.domain.model.confidence import Confidence
 from src.context.recognition.domain.model.text_fragment import TextFragment
 from src.shared_kernel.iso6346 import (
     BODY_LENGTH,
+    BODY_PATTERN,
     NUMBER_LENGTH,
     NUMBER_PATTERN,
     calculate_check_digit,
@@ -57,6 +58,9 @@ class _Window:
     confidence: float
     box: object | None
     raw: str
+    #: True when this is a 10-character body whose check digit was never read,
+    #: rather than a complete 11-character number.
+    body_only: bool = False
 
 
 class ContainerCodeExtractor:
@@ -97,11 +101,24 @@ class ContainerCodeExtractor:
 
     # -- scanning ----------------------------------------------------------
     def _windows(self, fragments: Sequence[TextFragment]) -> Iterable[_Window]:
-        """Every 11-character stretch worth examining.
+        """Every stretch of text worth examining.
 
         Fragments are tried alone and joined with their neighbours, because a
         container number is usually painted on more than one line and comes
         back from the engine already split apart.
+
+        Two rules stop that joining from inventing numbers out of unrelated
+        markings:
+
+        * A window may only **start** where a fragment starts. Without it, a
+          window can begin mid-word: the weights panel on a real container
+          turns ``PAYLOAD 27.400 60.410`` into ``OADZ7400604``, which happens
+          to satisfy the check digit and then outranks the real number.
+          Container numbers do not begin in the middle of a word.
+        * A ten-character body that **ends** exactly where a fragment ends is
+          also offered on its own. On most containers the check digit is
+          painted in its own box, and detectors routinely miss it - so the
+          real reading arrives one character short.
         """
         usable = [f for f in fragments if not f.is_empty]
 
@@ -111,22 +128,43 @@ class ContainerCodeExtractor:
                 if len(group) < length:
                     break
 
-                joined = "".join(self._clean(f.text) for f in group)
-                if len(joined) < NUMBER_LENGTH:
+                cleaned = [self._clean(f.text) for f in group]
+                joined = "".join(cleaned)
+                if len(joined) < BODY_LENGTH:
                     continue
+
+                # Offsets where a fragment begins, plus the very end.
+                edges: list[int] = []
+                position = 0
+                for piece in cleaned:
+                    edges.append(position)
+                    position += len(piece)
+                edges.append(position)
+                boundaries = set(edges)
 
                 # The weakest fragment in the group caps the confidence.
                 confidence = min(f.confidence.value for f in group)
                 box = group[0].box if len(group) == 1 else None
                 raw = " ".join(f.text for f in group)
 
-                for offset in range(len(joined) - NUMBER_LENGTH + 1):
-                    yield _Window(
-                        text=joined[offset : offset + NUMBER_LENGTH],
-                        confidence=confidence,
-                        box=box,
-                        raw=raw,
-                    )
+                for offset in edges:
+                    if offset + NUMBER_LENGTH <= len(joined):
+                        yield _Window(
+                            text=joined[offset : offset + NUMBER_LENGTH],
+                            confidence=confidence,
+                            box=box,
+                            raw=raw,
+                        )
+
+                    end = offset + BODY_LENGTH
+                    if end <= len(joined) and end in boundaries:
+                        yield _Window(
+                            text=joined[offset:end],
+                            confidence=confidence,
+                            box=box,
+                            raw=raw,
+                            body_only=True,
+                        )
 
     @staticmethod
     def _clean(text: str) -> str:
@@ -134,6 +172,9 @@ class ContainerCodeExtractor:
 
     # -- interpreting ------------------------------------------------------
     def _interpret(self, window: _Window) -> list[ContainerCodeCandidate]:
+        if window.body_only:
+            return self._interpret_body(window)
+
         coerced, coerced_by_shape = self._coerce(window.text)
         if not NUMBER_PATTERN.fullmatch(coerced):
             return []
@@ -174,8 +215,35 @@ class ContainerCodeExtractor:
             )
         return results
 
+    def _interpret_body(self, window: _Window) -> list[ContainerCodeCandidate]:
+        """Complete a reading whose check digit was never captured.
+
+        This is not the same as recomputing a check digit that *was* read and
+        disagreed - that would destroy the only independent check there is,
+        and is refused elsewhere. Here the character was never seen at all, so
+        arithmetic is the only thing that can supply it. The result is marked
+        ``check_digit_inferred`` and always goes to a person.
+        """
+        coerced, changed = self._coerce(window.text, BODY_LENGTH)
+        if not BODY_PATTERN.fullmatch(coerced):
+            return []
+
+        check_digit = calculate_check_digit(
+            coerced[0:3], coerced[3], coerced[4:BODY_LENGTH]
+        )
+        return [
+            self._candidate(
+                window,
+                value=f"{coerced}{check_digit}",
+                valid=True,
+                expected=check_digit,
+                repaired=changed,
+                inferred=True,
+            )
+        ]
+
     @staticmethod
-    def _coerce(window: str) -> tuple[str, bool]:
+    def _coerce(window: str, length: int = NUMBER_LENGTH) -> tuple[str, bool]:
         """Push each character towards the shape its position demands."""
         chars = list(window)
         changed = False
@@ -186,7 +254,7 @@ class ContainerCodeExtractor:
                 chars[index] = replacement
                 changed = True
 
-        for index in range(4, NUMBER_LENGTH):
+        for index in range(4, length):
             replacement = _TO_DIGIT.get(chars[index])
             if replacement is not None:
                 chars[index] = replacement
@@ -229,6 +297,7 @@ class ContainerCodeExtractor:
         valid: bool,
         expected: int,
         repaired: bool,
+        inferred: bool = False,
     ) -> ContainerCodeCandidate:
         return ContainerCodeCandidate(
             raw_text=window.raw,
@@ -237,5 +306,6 @@ class ContainerCodeExtractor:
             check_digit_valid=valid,
             expected_check_digit=expected,
             repaired=repaired,
+            check_digit_inferred=inferred,
             box=window.box,  # type: ignore[arg-type]
         )

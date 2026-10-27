@@ -20,3 +20,6 @@ Thumbs.db
 
 # Captured images
 var/
+
+# Local SQLite development database
+*.db

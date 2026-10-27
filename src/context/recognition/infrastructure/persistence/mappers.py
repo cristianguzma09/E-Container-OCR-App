@@ -66,6 +66,7 @@ def candidate_to_json(candidate: ContainerCodeCandidate) -> dict[str, Any]:
         "check_digit_valid": candidate.check_digit_valid,
         "expected_check_digit": candidate.expected_check_digit,
         "repaired": candidate.repaired,
+        "check_digit_inferred": candidate.check_digit_inferred,
         "box": _box_to_json(candidate.box),
     }
 
@@ -78,6 +79,7 @@ def candidate_from_json(data: dict[str, Any]) -> ContainerCodeCandidate:
         check_digit_valid=data["check_digit_valid"],
         expected_check_digit=data.get("expected_check_digit"),
         repaired=data.get("repaired", False),
+        check_digit_inferred=data.get("check_digit_inferred", False),
         box=_box_from_json(data.get("box")),
     )
 

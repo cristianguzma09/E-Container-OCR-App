@@ -22,6 +22,13 @@ class CandidateResponse(BaseModel):
     repaired: bool = Field(
         description="A confusable character was substituted to satisfy the check digit."
     )
+    check_digit_inferred: bool = Field(
+        description=(
+            "The check digit was never read - it is painted in its own box "
+            "and detectors often miss it - so it was computed from the other "
+            "ten characters. Show the number, but make the operator confirm it."
+        )
+    )
     needs_human_confirmation: bool
 
 

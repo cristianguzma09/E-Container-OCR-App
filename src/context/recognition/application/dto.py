@@ -53,6 +53,7 @@ class CandidateView:
     check_digit_valid: bool
     expected_check_digit: int | None
     repaired: bool
+    check_digit_inferred: bool
     needs_human_confirmation: bool
 
     @classmethod
@@ -65,6 +66,7 @@ class CandidateView:
             check_digit_valid=candidate.check_digit_valid,
             expected_check_digit=candidate.expected_check_digit,
             repaired=candidate.repaired,
+            check_digit_inferred=candidate.check_digit_inferred,
             needs_human_confirmation=candidate.needs_human_confirmation,
         )
 

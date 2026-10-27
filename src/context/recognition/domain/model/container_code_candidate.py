@@ -16,6 +16,15 @@ class ContainerCodeCandidate(ValueObject):
     The candidate keeps the raw text next to the cleaned-up value on purpose.
     When a read is sent for review, an operator needs to see what the camera
     actually produced, not only what the software decided it meant.
+
+    Three different things can make a reading uncertain, and they are kept
+    apart because an operator does something different about each:
+
+    * ``check_digit_valid`` false - the number as read does not add up.
+    * ``repaired`` - a confusable character was substituted to make it add up.
+    * ``check_digit_inferred`` - the check digit was never read at all (it is
+      painted in its own box on most containers, and detectors routinely miss
+      it) and has been computed from the other ten characters.
     """
 
     raw_text: str
@@ -24,6 +33,7 @@ class ContainerCodeCandidate(ValueObject):
     check_digit_valid: bool
     expected_check_digit: int | None = None
     repaired: bool = False
+    check_digit_inferred: bool = False
     box: BoundingBox | None = None
 
     @property
@@ -42,12 +52,19 @@ class ContainerCodeCandidate(ValueObject):
             score = self.confidence.value * 0.4
         if self.repaired:
             score -= 0.05
+        if self.check_digit_inferred:
+            # Computed, not seen. Ranks below a number that was read whole.
+            score -= 0.10
         return max(0.0, min(1.0, round(score, 4)))
 
     @property
     def needs_human_confirmation(self) -> bool:
-        """A repaired or check-digit-failing read is never accepted silently."""
-        return self.repaired or not self.check_digit_valid
+        """Never accept a reading silently unless it was read whole and checks out."""
+        return (
+            self.repaired
+            or self.check_digit_inferred
+            or not self.check_digit_valid
+        )
 
     def __str__(self) -> str:
         return self.value
